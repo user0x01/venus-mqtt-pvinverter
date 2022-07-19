@@ -1,0 +1,208 @@
+substitutions:
+  external_components_source: github://syssi/esphome-soyosource-gtn-virtual-meter@main
+  name: soyosource1
+  productname: "Soyosource GTN 1200G48"
+  customname: "Soyo GTN1200 1"
+  deviceinstance: "184"
+  phase: "1"
+  position: "1"
+
+esphome:
+  name: ${name}
+
+esp8266:
+  board: esp01_1m
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_key
+
+captive_portal:
+
+ota:
+
+mqtt:
+  broker: !secret mqtt_host
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  id: "esphome_${name}"
+  
+script:
+  - id: venus_init
+    ## venus  dbusservice.add_path()
+    then:
+      - logger.log: 
+          format: "publish ${name} init"
+          level: INFO
+      - mqtt.publish_json:
+          topic: venus/pvinverter/${name}/init
+          payload: |-
+            root["key"] = "${name}";
+            root["productname"] = "${productname}";
+            root["customname"] = "${customname}";
+            root["deviceinstance"] = $deviceinstance;
+            root["ip_address"] = id(ip_address).state;
+            root["phase"] = $phase;
+            root["position"] = $position;
+            root["timestamp"] = id(sntp_time).now().timestamp;
+  - id: venus_update
+    ## venus dbusservice[key]=values
+    then:
+      - logger.log: 
+          format: "publish ${name} update"
+          level: DEBUG
+      - mqtt.publish_json:
+          topic: venus/pvinverter/${name}/values
+          payload: |-
+            root["key"] = "${name}";
+            root["voltage"] = id(ac_voltage).state;
+            root["power"] = id(ac_power).state;
+            root["energy"] = id(total_energy).state;
+            root["maxpower"] = id(maxpower).state;
+            if (id(mode_id).state > 10)
+              root["powerlimit"] = id(limiter).state;
+            else
+              root["powerlimit"] = id(maxpower).state;
+            root["timestamp"] = id(sntp_time).now().timestamp;
+
+
+# debug:
+
+logger:
+  level: info
+  baud_rate: 0
+
+web_server:
+  port: 80
+  version: 1
+  include_internal: true
+  
+uart:
+  - id: uart0
+    baud_rate: 9600
+    tx_pin: GPIO1
+    rx_pin: GPIO3
+
+time:
+  - platform: sntp
+    id: sntp_time
+    servers: 0.pool.ntp.org
+    on_time:
+      - seconds: /240
+        then:
+          - script.execute: venus_init
+          - script.execute: venus_update
+
+external_components:
+  - source: ${external_components_source}
+    refresh: 0s
+
+soyosource_display:
+  uart_id: uart0
+  update_interval: 3s
+#  on_values_updated:
+#    then:
+#      - script.execute: venus_update
+
+binary_sensor:
+  - platform: soyosource_display
+    fan_running:
+      name: "${name} fan running"
+    limiter_connected:
+      name: "${name} limiter connected"    
+
+button:
+  - platform: safe_mode
+    name: "Restart (Safe Mode)"  
+  - platform: restart
+    name: "Restart"    
+
+number:
+  - platform: soyosource_display
+    start_voltage:
+      name: "${name} start voltage"
+    shutdown_voltage:
+      name: "${name} shutdown voltage"
+    # Maximum output power in limiter mode / Output power in constant power mode
+    output_power_limit:
+      name: "${name} output power limit"
+      id: maxpower
+    start_delay:
+      name: "${name} start delay"
+
+select:
+  - platform: soyosource_display
+    operation_mode:
+      name: "${name} operation mode"
+      optionsmap:
+        1: "PV CP"
+        17: "PV Limit"
+        2: "Battery CP"
+        18: "Battery Limit"
+
+sensor:
+  - platform: soyosource_display
+    error_bitmask:
+      name: "${name} error bitmask"
+    operation_mode_id:
+      name: "${name} operation mode id"
+      id: mode_id
+    operation_status_id:
+      name: "${name} operation status id"
+    battery_voltage:
+      name: "${name} battery voltage"
+    battery_current:
+      name: "${name} battery current"
+    battery_power:
+      name: "${name} battery power"
+      id: dc_power
+    total_energy:
+      name: "${name} total energy"
+      id: total_energy
+    ac_voltage:
+      name: "${name} ac voltage"
+      id: ac_voltage
+    ac_frequency:
+      name: "${name} ac frequency"
+    temperature:
+      name: "${name} temperature"
+      force_update: true 
+      ## last sensor in loop
+      on_value:
+        then:
+        - script.execute: venus_update      
+
+  - platform: copy
+    id: ac_power
+    source_id: dc_power
+    name: "${name} ac power"  
+    accuracy_decimals: 0
+    filters:
+     - calibrate_linear:
+         - 0 -> 0.1
+         - 31 -> 24
+         - 113 -> 96
+         - 247 -> 226
+         
+  - id: limiter
+    internal: true
+    platform: mqtt_subscribe
+    name: "${name} instantaneous power consumption"
+    topic: "powermeter/sensor/ipc/state"
+    accuracy_decimals: 2
+    unit_of_measurement: W
+    device_class: power
+
+text_sensor:
+  - platform: soyosource_display
+    errors:
+      name: "${name} errors"
+    operation_mode:
+      name: "${name} operation mode"
+    operation_status:
+      name: "${name} operation status"
+  - platform: wifi_info
+    ip_address:
+      name: ESP IP Address
+      id: ip_address
+      internal: true
