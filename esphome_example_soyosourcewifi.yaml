@@ -37,13 +37,15 @@ script:
       - mqtt.publish_json:
           topic: venus/pvinverter/${name}/init
           payload: |-
-            root["key"] = "${name}";
-            root["productname"] = "${productname}";
-            root["customname"] = "${customname}";
+            root["key"] = "$name";
+            root["productname"] = "$productname";
+            root["customname"] = "$customname";
             root["deviceinstance"] = $deviceinstance;
             root["ip_address"] = id(ip_address).state;
             root["phase"] = $phase;
             root["position"] = $position;
+            root["hardware"] = "ESPHome $name";
+            root["firmware"] = std::string(App.get_compilation_time()) + "(" + std::string(ESPHOME_VERSION) + ")";
             root["timestamp"] = id(sntp_time).now().timestamp;
   - id: venus_update
     ## venus dbusservice[key]=values
@@ -64,6 +66,16 @@ script:
             else
               root["powerlimit"] = id(maxpower).state;
             root["timestamp"] = id(sntp_time).now().timestamp;
+  - id: venus_close
+    ## venus  dbusservice.add_path()
+    then:
+      - logger.log: 
+          format: "publish ${name} close"
+          level: INFO
+      - mqtt.publish_json:
+          topic: venus/pvinverter/${name}/close
+          payload: |-
+            root["key"] = "${name}";
 
 
 # debug:
@@ -116,6 +128,11 @@ button:
     name: "Restart (Safe Mode)"  
   - platform: restart
     name: "Restart"    
+  - platform: template
+    name: "Venus Restart"
+    on_press:
+      then:
+        - script.execute: venus_close
 
 number:
   - platform: soyosource_display
