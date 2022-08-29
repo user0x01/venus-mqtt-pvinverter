@@ -15,8 +15,10 @@ import datetime
 
 #################################################
 servicenamespace = "com.victronenergy.pvinverter"
+productid = 1200
 path_UpdateIndex = "/UpdateIndex"
 disconnect_timeout = 60 
+null_timeout = 10
 # MQTT
 mqttbroker_address = "Homeassistant.local" ## mqtt server
 mqttclientid = "Venus.pvinverter"
@@ -25,6 +27,7 @@ mqttpassword = ""
 topics = "venus/pvinverter/#"  # Topicsfilter
 topic_init = "/init"  # Topic constructor
 topic_values = "/values"  # Topic values
+topic_close = "/close"  # Topic
 #################################################
 
 try:
@@ -98,11 +101,22 @@ def on_message(client, userdata, msg):
             deviceinstance = jsonpayload["deviceinstance"]
             productname = jsonpayload["productname"]
             customname = jsonpayload["customname"]
+            hardware = jsonpayload["hardware"]
+            firmware = jsonpayload["firmware"]
             phase = jsonpayload["phase"]
             ip_address = jsonpayload["ip_address"]
             position = jsonpayload["position" or 1]
             _newservice(key, deviceinstance, productname,
-                        customname, phase, position, ip_address)
+              customname, phase, position, ip_address, hardware, firmware)
+
+        if msg.topic.endswith(topic_close):
+            jsonpayload = json.loads(msg.payload)
+            key = jsonpayload["key"]
+            if not key in serivices:
+                return
+            serivice = serivices[key]
+            del serivices[key]
+            del serivice
 
         if msg.topic.endswith(topic_values):
             jsonpayload = json.loads(msg.payload)
@@ -130,7 +144,7 @@ def on_message(client, userdata, msg):
 
 class DbusService:
   phase = 1
-  timestanp = datetime.datetime.now(datetime.timezone.utc)
+  timestamp = datetime.datetime.now(datetime.timezone.utc)
 
   def __init__(self, servicename, deviceinstance, pathsReadOnly, pathsReadWrite):
     self._VeDbus = VeDbusService(servicename, dbusconnection())
@@ -144,19 +158,24 @@ class DbusService:
             onchangecallback=self._handlechangedvalue,
             gettextcallback=settings["gettextcallback"])
 
-    gobject.timeout_add(10*1000, self._disconnect)
+    gobject.timeout_add(1000, self._disconnect)
 
   def _handlechangedvalue(self, path, value):
     return True  # accept the change
 
   def _disconnect(self):
-    if datetime.datetime.now(datetime.timezone.utc) - self.timestanp > timedelta(seconds=disconnect_timeout):
+    nodata = datetime.datetime.now(datetime.timezone.utc) - self.timestamp
+    if nodata > timedelta(seconds=disconnect_timeout):
       self._VeDbus["/Connected"] = 0
+    if nodata > timedelta(seconds=null_timeout):
+      self._VeDbus["/Ac/Current"] = 0
+      self._VeDbus["/Ac/Power"] = 0
+      self._VeDbus["/Ac/L{:0}/Power".format(self.phase)] = 0
     return True
 
   def _update(self, curr, power, totalout, voltage, maxpower, powerlimit):
     try:
-      self.timestanp = datetime.datetime.now(datetime.timezone.utc)
+      self.timestamp = datetime.datetime.now(datetime.timezone.utc)
 
       # 7=Running; 8=Standby; 9=Boot loading; 10=Error
       self._VeDbus["/StatusCode"] = 7
@@ -178,7 +197,7 @@ class DbusService:
         print(e)
 
 
-def _newservice(key, deviceinstance, productname, customname, phase, position, ip_address):
+def _newservice(key, deviceinstance, productname, customname, phase, position, ip_address, hardware, firmware):
   global serivices
   servicename = servicenamespace + "." + key
 
@@ -189,13 +208,13 @@ def _newservice(key, deviceinstance, productname, customname, phase, position, i
     pathsReadOnly={
       "/Mgmt/ProcessName": {"initial": __file__ },
       "/Mgmt/ProcessVersion": {"initial": "Python" },
-      "/Mgmt/Connection": {"initial": "MQTT" },
+      "/Mgmt/Connection": {"initial": ip_address + " >-< " + mqttbroker_address},
       "/DeviceInstance": {"initial": deviceinstance},
-      "/ProductId": {"initial": 1200}, 
+      "/ProductId": {"initial": productid},
       '/ProductName': {'initial': productname},
       '/CustomName': {'initial': customname},
-      "/FirmwareVersion": {"initial": "Esphome"},
-      "/HardwareVersion": {"initial": "Wifi " + ip_address},
+      "/FirmwareVersion": {"initial": firmware},
+      "/HardwareVersion": {"initial": hardware},
       "/Position": {"initial": position},
       "/Show": {"initial": 1}
     },
