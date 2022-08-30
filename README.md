@@ -30,6 +30,34 @@ venus/pvinverter/soyosource1/values
 }
 ```
 
+# venus-mqtt-gridmeter
+connect gridmeter to victron gx via mqtt
+# Example topic for values:
+```
+venus/powermeter/values
+{
+  "Reverse": 132,
+  "Forward": 142,
+  "Power": 12,
+  "L1Voltage": 12,
+  "L2Voltage": 12,
+  "L3Voltage": 227.3126,
+  "L1Current": 12,
+  "L2Current": 12,
+  "L3Current": 0,
+  "L1Power": 12,
+  "L2Power": 12,
+  "L3Power": 0,
+  "L1EnergyForward": 12,
+  "L1EnergyReverse": 12,
+  "L2EnergyForward": 12,
+  "L2EnergyReverse": 12,
+  "L3EnergyForward": 12,
+  "L3EnergyReverse": 12,
+  "timestamp": 1661893778
+}
+```
+
 
 ## References
 
