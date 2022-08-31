@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
 """
-/data/Pathtothisscript/vedbus.py
-/data/Pathtothisscript/ve_utils.py
 opkg update && opkg upgrade python3-pip
 pip3 install paho-mqtt
+https://github.com/victronenergy/velib_python
+/data/Pathtothisscript/vedbus.py
+/data/Pathtothisscript/ve_utils.py
 """
 ##########################################
 servicename= 'com.victronenergy.grid.sdm';
@@ -12,7 +13,7 @@ customname = 'Powermeter via MQTT' ## name in Venus
 deviceinstance = 183 ## vrm nummer
 ##########################################
 path_UpdateIndex = '/UpdateIndex';
-null_timeout = 3
+null_timeout = 3 ## Disconnct after n seconds
 # MQTT
 mqttbroker_address = 'Homeassistant.local'  # mqtt server
 mqttclientid = 'Venus.GridMeter.1'
@@ -54,7 +55,6 @@ def on_disconnect(client, userdata, rc):
         print('Trying to Reconnect')
         client.connect(mqttbroker_address)
     except Exception as e:
-        logging.exception('Fehler beim reconnecten mit Broker')
         print('Error in Retrying to Connect with Broker')
         print(e)
 
