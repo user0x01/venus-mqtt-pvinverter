@@ -132,8 +132,8 @@ def on_message(client, userdata, msg):
                 curr = round(power / voltage, 2)
             else:
                 curr = 0.0
-            maxpower = float(jsonpayload["maxpower"] or 3000.0)
-            powerlimit = float(jsonpayload["powerlimit"] or None)
+            maxpower = float(jsonpayload["maxpower"] or 4800.0)
+            powerlimit = float(jsonpayload["powerlimit"] or 4800.0)
             serivice._update(curr, power, totalout,
                              voltage, maxpower, powerlimit)
 
