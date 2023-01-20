@@ -58,7 +58,7 @@ venus/powermeter/values
 }
 ```
 
-## installation
+## Unstallation
 please refer:
 https://github.com/RalfZim/venus.dbus-fronius-smartmeter#installation
 
@@ -69,6 +69,7 @@ pip install paho-mqtt
 ```
 
 edit mqttsettings in the Pythonfile
+```
 # MQTT
 mqttbroker_address = "Homeassistant.local" ## mqtt server
 mqttclientid = "Venus.pvinverter"
@@ -78,6 +79,7 @@ topics = "venus/pvinverter/#"  # Topicsfilter
 topic_init = "/init"  # Topic constructor
 topic_values = "/values"  # Topic values
 topic_close = "/close"  # Topic
+```
 
 start ../service/run
 or reboot 
